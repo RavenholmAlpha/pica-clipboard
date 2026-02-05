@@ -1,0 +1,136 @@
+import { Button, VerticalBox, LineEdit, ScrollView, HorizontalBox, StandardListView } from "std-widgets.slint";
+
+struct ClipboardItem {
+    id: int,
+    type_val: int, // 1=Text, 2=Image
+    content: string,
+    is_pinned: bool,
+    source: string,
+}
+
+export component AppWindow inherits Window {
+    title: "PICAclip";
+    width: 400px;
+    height: 600px;
+    always-on-top: true;
+    // frameless: true; // Can be controlled from Rust or here if supported
+
+    in-out property <[ClipboardItem]> history_model: [
+        {id: 1, type_val: 1, content: "Loading...", is_pinned: false, source: "System"}
+    ];
+    in-out property <string> search_query;
+
+    callback search(string);
+    callback paste_item(int);
+    callback delete_item(int);
+    callback toggle_pin(int);
+    callback hide_window();
+    callback toggle_queue_mode(bool);
+    callback next_queue_item();
+
+    property <bool> queue_mode_enabled: false;
+
+    VerticalBox {
+        padding: 10px;
+        spacing: 10px;
+
+        // Toolbar
+        HorizontalBox {
+            spacing: 5px;
+            Button {
+                text: root.queue_mode_enabled ? "Queue: ON" : "Queue: OFF";
+                clicked => {
+                    root.queue_mode_enabled = !root.queue_mode_enabled;
+                    root.toggle_queue_mode(root.queue_mode_enabled);
+                }
+            }
+            Button {
+                text: "Paste Next";
+                enabled: root.queue_mode_enabled;
+                clicked => {
+                    root.next_queue_item();
+                }
+            }
+        }
+
+        // Search Bar
+        HorizontalBox {
+            height: 35px;
+            LineEdit {
+                placeholder-text: "Search...";
+                edited => {
+                    root.search(self.text);
+                }
+            }
+            Button {
+                text: "X";
+                width: 30px;
+                clicked => { root.hide_window(); }
+            }
+        }
+
+        // History List
+        ScrollView {
+            VerticalLayout {
+                spacing: 5px;
+                for item in root.history_model : Rectangle {
+                    height: 60px;
+                    background: touch.pressed ? #e0e0e0 : #f5f5f5;
+                    border-radius: 4px;
+
+                    TouchArea {
+                        id: touch;
+                        clicked => {
+                            root.paste_item(item.id);
+                        }
+                    }
+
+                    HorizontalBox {
+                        padding: 5px;
+                        spacing: 10px;
+
+                        // Icon / Pin
+                        Rectangle {
+                            width: 20px;
+                            height: 20px;
+                            border-radius: 10px;
+                            background: item.is_pinned ? #ffeb3b : #bdbdbd;
+
+                            TouchArea {
+                                clicked => {
+                                    root.toggle_pin(item.id);
+                                }
+                            }
+                        }
+
+                        // Content
+                        VerticalLayout {
+                            Text {
+                                text: item.content;
+                                overflow: elide;
+                                font-size: 14px;
+                            }
+                            Text {
+                                text: item.type_val == 2 ? "[Image]" : item.source;
+                                color: #888888;
+                                font-size: 10px;
+                            }
+                        }
+
+                        // Delete Button
+                        Rectangle {
+                            width: 20px;
+                            color: red;
+                            Text { text: "x"; color: red; }
+                            TouchArea {
+                                clicked => {
+                                    root.delete_item(item.id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
